@@ -93,7 +93,7 @@ func (i *Initrd) ResolveLinkedLibs(resolver *ELFLibResolver) error {
 }
 
 // WriteTo writes the file to the given archive writer.
-func (i *Initrd) WriteTo(w *Writer) error {
+func (i *Initrd) WriteTo(w Writer) error {
 	for _, file := range *i {
 		if err := file.WriteTo(w); err != nil {
 			return err

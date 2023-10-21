@@ -36,7 +36,7 @@ type FileSpec struct {
 
 // WriteTo calls the appropirate write method of the given [Writer] according
 // to its [FileType].
-func (s *FileSpec) WriteTo(w *Writer) error {
+func (s *FileSpec) WriteTo(w Writer) error {
 	switch s.FileType {
 	case FileTypeRegular:
 		return w.WriteRegular(absRootPath(s.ArchivePath), s.RelatedPath, s.Mode)

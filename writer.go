@@ -9,28 +9,35 @@ import (
 	"github.com/cavaliergopher/cpio"
 )
 
-// Writer wraps cpio.Writer.
-type Writer struct {
+// Writer defines initrd archive writer interface.
+type Writer interface {
+	WriteRegular(string, string, fs.FileMode) error
+	WriteDirectory(string) error
+	WriteLink(string, string) error
+}
+
+// CPIOWriter wraps cpio.CPIOWriter.
+type CPIOWriter struct {
 	cpioWriter *cpio.Writer
 }
 
-// NewWriter creates a new archive writer.
-func NewWriter(w io.Writer) *Writer {
-	return &Writer{cpio.NewWriter(w)}
+// NewCPIOWriter creates a new archive writer.
+func NewCPIOWriter(w io.Writer) *CPIOWriter {
+	return &CPIOWriter{cpio.NewWriter(w)}
 }
 
 // Close closes the [Writer]. Flush is called by the underlying closer.
-func (w *Writer) Close() error {
+func (w *CPIOWriter) Close() error {
 	return w.cpioWriter.Close()
 }
 
 // Flush writes the data to the underlying [io.Writer].
-func (w *Writer) Flush() error {
+func (w *CPIOWriter) Flush() error {
 	return w.cpioWriter.Flush()
 }
 
 // writeHeader writes the cpio header.
-func (w *Writer) writeHeader(hdr *cpio.Header) error {
+func (w *CPIOWriter) writeHeader(hdr *cpio.Header) error {
 	if err := w.cpioWriter.WriteHeader(hdr); err != nil {
 		return fmt.Errorf("write header for %s: %v", hdr.Name, err)
 	}
@@ -38,7 +45,7 @@ func (w *Writer) writeHeader(hdr *cpio.Header) error {
 }
 
 // WriteDirectory add a directory entry for the given path to the archive.
-func (w *Writer) WriteDirectory(path string) error {
+func (w *CPIOWriter) WriteDirectory(path string) error {
 	header := &cpio.Header{
 		Name:  path,
 		Mode:  cpio.TypeDir | cpio.ModePerm,
@@ -49,7 +56,7 @@ func (w *Writer) WriteDirectory(path string) error {
 
 // WriteLink adds a symbolic link for the given path pointing to the given
 // target.
-func (w *Writer) WriteLink(path, target string) error {
+func (w *CPIOWriter) WriteLink(path, target string) error {
 	header := &cpio.Header{
 		Name: path,
 		Mode: cpio.TypeSymlink | cpio.ModePerm,
@@ -68,7 +75,7 @@ func (w *Writer) WriteLink(path, target string) error {
 }
 
 // WriteRegular copies the exisiting file from source into the archive.
-func (w *Writer) WriteRegular(path, source string, mode fs.FileMode) error {
+func (w *CPIOWriter) WriteRegular(path, source string, mode fs.FileMode) error {
 	file, err := os.Open(source)
 	if err != nil {
 		return fmt.Errorf("open file %s: %v", source, err)
