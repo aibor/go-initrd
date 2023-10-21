@@ -6,8 +6,13 @@ import (
 	"slices"
 )
 
-// LibDir is the archive's directory for all dynamically linked libraries.
-const LibDir = "lib"
+const (
+	// LibDir is the archive's directory for all dynamically linked libraries.
+	LibDir = "lib"
+	// AdditionalFilesDir is the archive's directory for all additional files
+	// beside the init file.
+	AdditionalFilesDir = "files"
+)
 
 // Initrd is the collection of archive files.
 type Initrd []FileSpec
@@ -23,13 +28,13 @@ func New(initFile string, additionalFiles ...string) Initrd {
 			Mode:        0755,
 		},
 		FileSpec{
-			ArchivePath: "files",
+			ArchivePath: AdditionalFilesDir,
 			FileType:    FileTypeDirectory,
 		},
 	}
 	for _, file := range additionalFiles {
 		initrd = append(initrd, FileSpec{
-			ArchivePath: absRootPath("files", filepath.Base(file)),
+			ArchivePath: filepath.Join(AdditionalFilesDir, filepath.Base(file)),
 			RelatedPath: file,
 			FileType:    FileTypeRegular,
 			Mode:        0755,

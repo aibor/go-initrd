@@ -34,7 +34,7 @@ type FileSpec struct {
 	Mode fs.FileMode
 }
 
-// WriteTo calls the appropirate write method of the given [Writer] according
+// WriteTo calls the appropriate write method of the given [Writer] according
 // to its [FileType].
 func (s *FileSpec) WriteTo(w Writer) error {
 	switch s.FileType {
@@ -51,6 +51,11 @@ func (s *FileSpec) WriteTo(w Writer) error {
 
 // absRootPath wraps [filepath.Join] and prefixes the path with "/".
 func absRootPath(parts ...string) string {
-	parts = append([]string{string(filepath.Separator)}, parts...)
-	return filepath.Join(parts...)
+	sep := string(filepath.Separator)
+	parts = append([]string{sep}, parts...)
+	path := filepath.Join(parts...)
+	if path == sep {
+		return ""
+	}
+	return path
 }
