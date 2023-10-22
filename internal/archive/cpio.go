@@ -1,4 +1,4 @@
-package initrd
+package archive
 
 import (
 	"fmt"
@@ -9,14 +9,7 @@ import (
 	"github.com/cavaliergopher/cpio"
 )
 
-// Writer defines initrd archive writer interface.
-type Writer interface {
-	WriteRegular(string, string, fs.FileMode) error
-	WriteDirectory(string) error
-	WriteLink(string, string) error
-}
-
-// CPIOWriter wraps cpio.CPIOWriter.
+// CPIOWriter implements [Writer] for [cpio.CPIOWriter].
 type CPIOWriter struct {
 	cpioWriter *cpio.Writer
 }

@@ -2,107 +2,137 @@ package initrd
 
 import (
 	"fmt"
+	"io"
 	"path/filepath"
 	"slices"
+
+	"github.com/aibor/go-initrd/internal/archive"
+	"github.com/aibor/go-initrd/internal/files"
 )
 
 const (
-	// LibDir is the archive's directory for all dynamically linked libraries.
-	LibDir = "lib"
+	// LibsDir is the archive's directory for all dynamically linked libraries.
+	LibsDir = "lib"
 	// AdditionalFilesDir is the archive's directory for all additional files
 	// beside the init file.
-	AdditionalFilesDir = "files"
+	FilesDir = "files"
+	// LibSearchPath defines the directories to lookup linked libraries.
+	LibSearchPath = "/lib:/lib64:/usr/lib:/usr/lib64"
 )
 
-// Initrd is the collection of archive files.
-type Initrd []FileSpec
-
-// New creates a new [Initrd]. initFile is added as "/init". All additional
-// files are added to the directory "files".
-func New(initFile string, additionalFiles ...string) Initrd {
-	initrd := Initrd{
-		FileSpec{
-			ArchivePath: "init",
-			RelatedPath: initFile,
-			FileType:    FileTypeRegular,
-			Mode:        0755,
-		},
-		FileSpec{
-			ArchivePath: AdditionalFilesDir,
-			FileType:    FileTypeDirectory,
-		},
-	}
-	for _, file := range additionalFiles {
-		initrd = append(initrd, FileSpec{
-			ArchivePath: filepath.Join(AdditionalFilesDir, filepath.Base(file)),
-			RelatedPath: file,
-			FileType:    FileTypeRegular,
-			Mode:        0755,
-		})
-	}
-	return initrd
+// InitRD represents a file tree that can be used as an initrd for the Linux
+// kernel.
+//
+// Create a new instance using [New]. Additional files can be added with
+// [InitRD.AddFiles]. Dynamically linked ELF libraries can be resolved and added
+// for all already added files by calling [InitRD.ResolveLinkedLibs]. Once
+// ready, write the [InitRD] with [InitRD.WriteCPIO].
+type InitRD struct {
+	fileTree files.Tree
 }
 
-// ResolveLinkedLibs resolves the dynamically linked libraries for each regular
-// file in [Initrd]. The libraries are added to the archive's [LibDir]. Symlinks
-// for the resolver's search paths are added, pointing to [LibDir].
-func (i *Initrd) ResolveLinkedLibs(resolver *ELFLibResolver) error {
-	for _, f := range *i {
-		if f.FileType != FileTypeRegular {
-			continue
-		}
-		if err := resolver.Resolve(f.RelatedPath); err != nil {
-			return fmt.Errorf("resolve: %v", err)
-		}
-	}
-	dirPaths := make([]string, 0)
-	libs := resolver.Libs()
-	newFiles := make([]FileSpec, 0)
-	var addDir func(path string)
-	addDir = func(dir string) {
-		if dir == "." || dir == "/" || slices.Contains(dirPaths, dir) {
-			return
-		}
-		addDir(filepath.Dir(dir))
-		dirPaths = append(dirPaths, dir)
-		newFiles = append(newFiles, FileSpec{
-			ArchivePath: dir,
-			FileType:    FileTypeDirectory,
-		})
-	}
-	addDir(LibDir)
-	for _, searchPath := range resolver.searchPaths {
-		if searchPath == absRootPath(LibDir) {
-			continue
-		}
+// New creates a new [InitRD] with the given file added as "/init".
+func New(initFile string) *InitRD {
+	fileTree := files.Tree{}
+	_, _ = fileTree.GetRoot().AddFile("init", initFile)
+	return &InitRD{fileTree}
+}
 
-		addDir(filepath.Dir(searchPath))
+// AddFiles creates [FilesDir] and adds the given files to it.
+func (i *InitRD) AddFiles(files ...string) error {
+	if len(files) == 0 {
+		return nil
+	}
 
-		newFiles = append(newFiles, FileSpec{
-			ArchivePath: searchPath,
-			RelatedPath: absRootPath(LibDir),
-			FileType:    FileTypeLink,
-		})
+	dirEntry, err := i.fileTree.Mkdir(FilesDir)
+	if err != nil {
+		return fmt.Errorf("add dir: %v", err)
 	}
-	for _, lib := range libs {
-		newFiles = append(newFiles, FileSpec{
-			ArchivePath: filepath.Join(LibDir, filepath.Base(lib)),
-			RelatedPath: lib,
-			FileType:    FileTypeRegular,
-			Mode:        0755,
-		})
+
+	for _, file := range files {
+		if _, err := dirEntry.AddFile(filepath.Base(file), file); err != nil {
+			return fmt.Errorf("add file %s: %v", file, err)
+		}
 	}
-	*i = append(*i, newFiles...)
 
 	return nil
 }
 
-// WriteTo writes the file to the given archive writer.
-func (i *Initrd) WriteTo(w Writer) error {
-	for _, file := range *i {
-		if err := file.WriteTo(w); err != nil {
-			return err
+// ResolveLinkedLibs recursively resolves the dynamically linked libraries of
+// all regular files in the [InitRD].
+//
+// If the given searchPath string is empty the default [LibSearchPath] is used.
+// Resolved libraries are added to [LibsDir]. For each search path a symoblic
+// link is added pointiong to [LibsDir].
+func (i *InitRD) ResolveLinkedLibs(searchPath string) error {
+	if searchPath == "" {
+		searchPath = LibSearchPath
+	}
+	searchPaths := filepath.SplitList(searchPath)
+	searchPaths = slices.DeleteFunc(searchPaths, func(e string) bool { return e == "" })
+
+	resolver := files.ELFLibResolver{
+		SearchPaths: searchPaths,
+	}
+
+	err := i.fileTree.Walk(func(path string, entry *files.Entry) error {
+		if entry.Type != files.TypeRegular {
+			return nil
+		}
+		return resolver.Resolve(entry.RelatedPath)
+	})
+	if err != nil {
+		return fmt.Errorf("resolve: %v", err)
+	}
+
+	if len(resolver.Libs) == 0 {
+		return nil
+	}
+
+	dirEntry, err := i.fileTree.Mkdir(LibsDir)
+	if err != nil {
+		return fmt.Errorf("add libs dir: %v", err)
+	}
+	for _, lib := range resolver.Libs {
+		name := filepath.Base(lib)
+		if _, err := dirEntry.AddFile(name, lib); err != nil {
+			return fmt.Errorf("add lib %s: %v", name, err)
 		}
 	}
+
+	absLibDir := filepath.Join(string(filepath.Separator), LibsDir)
+	for _, searchPath := range searchPaths {
+		dir, name := filepath.Split(searchPath)
+		dirEntry, err := i.fileTree.Mkdir(dir)
+		if err != nil {
+			return fmt.Errorf("get dir: %v", err)
+		}
+		if _, err := dirEntry.AddLink(name, absLibDir); err != nil {
+			return fmt.Errorf("add lib link %s: %v", searchPath, err)
+		}
+	}
+
 	return nil
+}
+
+// WriteCPIO writes the [InitRD] as CPIO archive to the given writer.
+func (i *InitRD) WriteCPIO(writer io.Writer) error {
+	w := archive.NewCPIOWriter(writer)
+	defer w.Close()
+	return i.fileTree.Walk(func(p string, e *files.Entry) error {
+		return writeEntry(w, p, e)
+	})
+}
+
+func writeEntry(writer archive.Writer, path string, entry *files.Entry) error {
+	switch entry.Type {
+	case files.TypeRegular:
+		return writer.WriteRegular(path, entry.RelatedPath, 0755)
+	case files.TypeDirectory:
+		return writer.WriteDirectory(path)
+	case files.TypeLink:
+		return writer.WriteLink(path, entry.RelatedPath)
+	default:
+		return fmt.Errorf("unknown file type %d", entry.Type)
+	}
 }

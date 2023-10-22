@@ -1,69 +1,85 @@
-package initrd_test
+package initrd
 
 import (
-	"path/filepath"
 	"testing"
 
-	"github.com/aibor/go-initrd"
+	"github.com/aibor/go-initrd/internal/archive"
+	"github.com/aibor/go-initrd/internal/files"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestInitrdNew(t *testing.T) {
-	i := initrd.New("first", "second", "rel/third", "/abs/fourth")
-	expected := initrd.Initrd{
-		initrd.FileSpec{
-			ArchivePath: "init",
-			RelatedPath: "first",
-			FileType:    initrd.FileTypeRegular,
-			Mode:        0755,
-		},
-		initrd.FileSpec{
-			ArchivePath: initrd.AdditionalFilesDir,
-			FileType:    initrd.FileTypeDirectory,
-		},
-		initrd.FileSpec{
-			ArchivePath: filepath.Join(initrd.AdditionalFilesDir, "second"),
-			RelatedPath: "second",
-			FileType:    initrd.FileTypeRegular,
-			Mode:        0755,
-		},
-		initrd.FileSpec{
-			ArchivePath: filepath.Join(initrd.AdditionalFilesDir, "third"),
-			RelatedPath: "rel/third",
-			FileType:    initrd.FileTypeRegular,
-			Mode:        0755,
-		},
-		initrd.FileSpec{
-			ArchivePath: filepath.Join(initrd.AdditionalFilesDir, "fourth"),
-			RelatedPath: "/abs/fourth",
-			FileType:    initrd.FileTypeRegular,
-			Mode:        0755,
-		},
-	}
-	assert.Equal(t, expected, i)
+func TestInitRDNew(t *testing.T) {
+	initRD := New("first")
+	entry, err := initRD.fileTree.GetEntry("/init")
+	require.NoError(t, err)
+	assert.Equal(t, "first", entry.RelatedPath)
+	assert.Equal(t, files.TypeRegular, entry.Type)
 }
 
-func TestInitrdWriteTo(t *testing.T) {
-	t.Run("works", func(t *testing.T) {
-		i := initrd.Initrd{
-			initrd.FileSpec{
-				FileType: initrd.FileTypeRegular,
-			},
+func TestWriteEntry(t *testing.T) {
+	t.Run("unknown file type", func(t *testing.T) {
+		entry := &files.Entry{
+			Type: files.Type(99),
 		}
-		mock := initrd.MockWriter{}
-		err := i.WriteTo(&mock)
-		assert.NoError(t, err)
-		assert.Equal(t, initrd.MockWriter{}, mock)
-	})
-	t.Run("fails", func(t *testing.T) {
-		i := initrd.Initrd{
-			initrd.FileSpec{
-				FileType: initrd.FileTypeRegular,
-			},
-		}
-		mock := initrd.MockWriter{Err: assert.AnError}
-		err := i.WriteTo(&mock)
-		assert.Error(t, err, assert.AnError)
+		err := writeEntry(&archive.MockWriter{}, "init", entry)
+		assert.ErrorContains(t, err, "unknown file type 99")
 	})
 
+	tests := []struct {
+		name  string
+		entry files.Entry
+		mock  archive.MockWriter
+		err   error
+	}{
+		{
+			name: "regular",
+			entry: files.Entry{
+				Type:        files.TypeRegular,
+				RelatedPath: "input",
+			},
+			mock: archive.MockWriter{
+				Path:        "init",
+				RelatedPath: "input",
+				Mode:        0755,
+			},
+		},
+		{
+			name: "directory",
+			entry: files.Entry{
+				Type: files.TypeDirectory,
+			},
+			mock: archive.MockWriter{
+				Path: "init",
+			},
+		},
+		{
+			name: "link",
+			entry: files.Entry{
+				Type:        files.TypeLink,
+				RelatedPath: "/lib",
+			},
+			mock: archive.MockWriter{
+				Path:        "init",
+				RelatedPath: "/lib",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Run("works", func(t *testing.T) {
+				mock := archive.MockWriter{}
+				err := writeEntry(&mock, "init", &tt.entry)
+				assert.NoError(t, err)
+				assert.Equal(t, tt.mock, mock)
+			})
+			t.Run("fails", func(t *testing.T) {
+				mock := archive.MockWriter{Err: assert.AnError}
+				err := writeEntry(&mock, "init", &tt.entry)
+				assert.Error(t, err, assert.AnError)
+			})
+		})
+	}
 }

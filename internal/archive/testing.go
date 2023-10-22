@@ -1,4 +1,4 @@
-package initrd
+package archive
 
 import "io/fs"
 

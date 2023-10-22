@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"slices"
-	"strings"
 
 	"github.com/aibor/go-initrd"
 )
@@ -16,20 +14,16 @@ func run(args []string) error {
 
 	initFile := args[0]
 	additionalFiles := args[1:]
-	i := initrd.New(initFile, additionalFiles...)
+	libSearchPath := os.Getenv("GOINITRDLIBPATH")
 
-	searchPathString := strings.TrimSpace(os.Getenv("GOINITRDSEARCH"))
-	searchPaths := strings.Split(searchPathString, ":")
-	searchPaths = slices.DeleteFunc(searchPaths, func(e string) bool { return e == "" })
-
-	resolver := initrd.NewELFLibResolver(searchPaths...)
-	if err := i.ResolveLinkedLibs(resolver); err != nil {
-		return fmt.Errorf("resolve: %v", err)
+	initRD := initrd.New(initFile)
+	if err := initRD.AddFiles(additionalFiles...); err != nil {
+		return fmt.Errorf("add files: %v", err)
 	}
-
-	writer := initrd.NewCPIOWriter(os.Stdout)
-	defer writer.Close()
-	if err := i.WriteTo(writer); err != nil {
+	if err := initRD.ResolveLinkedLibs(libSearchPath); err != nil {
+		return fmt.Errorf("add files: %v", err)
+	}
+	if err := initRD.WriteCPIO(os.Stdout); err != nil {
 		return fmt.Errorf("write: %v", err)
 	}
 
