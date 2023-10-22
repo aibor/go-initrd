@@ -108,7 +108,9 @@ func (i *InitRD) ResolveLinkedLibs(searchPath string) error {
 			return fmt.Errorf("get dir: %v", err)
 		}
 		if _, err := dirEntry.AddLink(name, absLibDir); err != nil {
-			return fmt.Errorf("add lib link %s: %v", searchPath, err)
+			if err != files.ErrFSEntryExists {
+				return fmt.Errorf("add lib link %s: %v", searchPath, err)
+			}
 		}
 	}
 

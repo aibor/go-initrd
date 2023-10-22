@@ -47,10 +47,10 @@ func (e *Entry) AddLink(name, relatedPath string) (*Entry, error) {
 
 func (e *Entry) AddEntry(name string, entry *Entry) (*Entry, error) {
 	if !e.IsDir() {
-		return nil, errFSEntryNotDir
+		return nil, ErrFSEntryNotDir
 	}
 	if ee, exists := e.children[name]; exists {
-		return ee, errFSEntryExists
+		return ee, ErrFSEntryExists
 	}
 	if e.children == nil {
 		e.children = make(map[string]*Entry)
@@ -61,11 +61,11 @@ func (e *Entry) AddEntry(name string, entry *Entry) (*Entry, error) {
 
 func (e *Entry) GetEntry(name string) (*Entry, error) {
 	if !e.IsDir() {
-		return nil, errFSEntryNotDir
+		return nil, ErrFSEntryNotDir
 	}
 	entry, exists := e.children[name]
 	if !exists {
-		return nil, errFSEntryNotExists
+		return nil, ErrFSEntryNotExists
 	}
 	return entry, nil
 }

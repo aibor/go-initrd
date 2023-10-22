@@ -4,6 +4,6 @@ import (
 	"errors"
 )
 
-var errFSEntryNotDir = errors.New("entry is not a directory")
-var errFSEntryNotExists = errors.New("entry does not exist")
-var errFSEntryExists = errors.New("entry does not exist")
+var ErrFSEntryNotDir = errors.New("entry is not a directory")
+var ErrFSEntryNotExists = errors.New("entry does not exist")
+var ErrFSEntryExists = errors.New("entry does not exist")

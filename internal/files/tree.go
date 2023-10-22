@@ -49,7 +49,7 @@ func (t *Tree) Mkdir(path string) (*Entry, error) {
 		return nil, fmt.Errorf("mkdir %s: %v", path, err)
 	}
 	entry, err := parent.AddDirectory(name)
-	if err == errFSEntryExists {
+	if err == ErrFSEntryExists {
 		err = nil
 	}
 	return entry, err
