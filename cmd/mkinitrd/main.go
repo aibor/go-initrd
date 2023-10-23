@@ -21,7 +21,7 @@ func run(args []string) error {
 		return fmt.Errorf("add files: %v", err)
 	}
 	if err := initRD.ResolveLinkedLibs(libSearchPath); err != nil {
-		return fmt.Errorf("add files: %v", err)
+		return fmt.Errorf("add linked libs: %v", err)
 	}
 	if err := initRD.WriteCPIO(os.Stdout); err != nil {
 		return fmt.Errorf("write: %v", err)

@@ -33,17 +33,14 @@ type InitRD struct {
 
 // New creates a new [InitRD] with the given file added as "/init".
 func New(initFile string) *InitRD {
-	fileTree := files.Tree{}
-	_, _ = fileTree.GetRoot().AddFile("init", initFile)
-	return &InitRD{fileTree}
+	i := InitRD{}
+	// THis can never fail on a new tree.
+	_, _ = i.fileTree.GetRoot().AddFile("init", initFile)
+	return &i
 }
 
 // AddFiles creates [FilesDir] and adds the given files to it.
 func (i *InitRD) AddFiles(files ...string) error {
-	if len(files) == 0 {
-		return nil
-	}
-
 	dirEntry, err := i.fileTree.Mkdir(FilesDir)
 	if err != nil {
 		return fmt.Errorf("add dir: %v", err)
@@ -85,10 +82,6 @@ func (i *InitRD) ResolveLinkedLibs(searchPath string) error {
 		return fmt.Errorf("resolve: %v", err)
 	}
 
-	if len(resolver.Libs) == 0 {
-		return nil
-	}
-
 	dirEntry, err := i.fileTree.Mkdir(LibsDir)
 	if err != nil {
 		return fmt.Errorf("add libs dir: %v", err)
@@ -102,15 +95,9 @@ func (i *InitRD) ResolveLinkedLibs(searchPath string) error {
 
 	absLibDir := filepath.Join(string(filepath.Separator), LibsDir)
 	for _, searchPath := range searchPaths {
-		dir, name := filepath.Split(searchPath)
-		dirEntry, err := i.fileTree.Mkdir(dir)
-		if err != nil {
-			return fmt.Errorf("get dir: %v", err)
-		}
-		if _, err := dirEntry.AddLink(name, absLibDir); err != nil {
-			if err != files.ErrFSEntryExists {
-				return fmt.Errorf("add lib link %s: %v", searchPath, err)
-			}
+		err := i.fileTree.Ln(absLibDir, searchPath)
+		if err != nil && err != files.ErrEntryExists {
+			return fmt.Errorf("add link %s: %v", searchPath, err)
 		}
 	}
 
@@ -121,20 +108,20 @@ func (i *InitRD) ResolveLinkedLibs(searchPath string) error {
 func (i *InitRD) WriteCPIO(writer io.Writer) error {
 	w := archive.NewCPIOWriter(writer)
 	defer w.Close()
-	return i.fileTree.Walk(func(p string, e *files.Entry) error {
-		return writeEntry(w, p, e)
-	})
+	return i.writeTo(w)
 }
 
-func writeEntry(writer archive.Writer, path string, entry *files.Entry) error {
-	switch entry.Type {
-	case files.TypeRegular:
-		return writer.WriteRegular(path, entry.RelatedPath, 0755)
-	case files.TypeDirectory:
-		return writer.WriteDirectory(path)
-	case files.TypeLink:
-		return writer.WriteLink(path, entry.RelatedPath)
-	default:
-		return fmt.Errorf("unknown file type %d", entry.Type)
-	}
+func (i *InitRD) writeTo(writer archive.Writer) error {
+	return i.fileTree.Walk(func(path string, entry *files.Entry) error {
+		switch entry.Type {
+		case files.TypeRegular:
+			return writer.WriteRegular(path, entry.RelatedPath, 0755)
+		case files.TypeDirectory:
+			return writer.WriteDirectory(path)
+		case files.TypeLink:
+			return writer.WriteLink(path, entry.RelatedPath)
+		default:
+			return fmt.Errorf("unknown file type %d", entry.Type)
+		}
+	})
 }
