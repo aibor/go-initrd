@@ -1,6 +1,6 @@
 package files
 
-// Type defines the type of a file.
+// Type defines the type of an [Entry].
 type Type int
 
 const (
