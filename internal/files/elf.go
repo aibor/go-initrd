@@ -30,7 +30,8 @@ func (r *ELFLibResolver) Resolve(elfFile string) error {
 	for _, lib := range libs {
 		var found bool
 		for _, searchPath := range r.SearchPaths {
-			path, err := filepath.EvalSymlinks(filepath.Join(searchPath, lib))
+			path := filepath.Join(searchPath, lib)
+			_, err := os.Stat(path)
 			if err != nil {
 				if errors.Is(err, os.ErrNotExist) {
 					continue
