@@ -14,7 +14,7 @@ func run(args []string) error {
 
 	initFile := args[0]
 	additionalFiles := args[1:]
-	libSearchPath := os.Getenv("GOINITRDLIBPATH")
+	libSearchPath := os.Getenv("LD_LIBRARY_PATH")
 
 	initRD := initrd.New(initFile)
 	if err := initRD.AddFiles(additionalFiles...); err != nil {
