@@ -1,29 +1,29 @@
-package initrd
+package initramfs
 
 import (
 	"path/filepath"
 	"testing"
 
-	"github.com/aibor/go-initrd/internal/archive"
-	"github.com/aibor/go-initrd/internal/files"
+	"github.com/aibor/initramfs/internal/archive"
+	"github.com/aibor/initramfs/internal/files"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestInitRDNew(t *testing.T) {
-	initRD := New("first")
-	entry, err := initRD.fileTree.GetEntry("/init")
+func TestArchiveNew(t *testing.T) {
+	archive := New("first")
+	entry, err := archive.fileTree.GetEntry("/init")
 	require.NoError(t, err)
 	assert.Equal(t, "first", entry.RelatedPath)
 	assert.Equal(t, files.TypeRegular, entry.Type)
 }
 
-func TestInitRDAddFile(t *testing.T) {
-	initRD := New("first")
+func TestArchiveAddFile(t *testing.T) {
+	archive := New("first")
 
-	require.NoError(t, initRD.AddFiles("second", "rel/third", "/abs/fourth"))
-	require.NoError(t, initRD.AddFiles("fifth"))
-	require.NoError(t, initRD.AddFiles())
+	require.NoError(t, archive.AddFiles("second", "rel/third", "/abs/fourth"))
+	require.NoError(t, archive.AddFiles("fifth"))
+	require.NoError(t, archive.AddFiles())
 
 	expected := map[string]string{
 		"second": "second",
@@ -34,16 +34,16 @@ func TestInitRDAddFile(t *testing.T) {
 
 	for file, relPath := range expected {
 		path := filepath.Join("files", file)
-		e, err := initRD.fileTree.GetEntry(path)
+		e, err := archive.fileTree.GetEntry(path)
 		require.NoError(t, err, path)
 		assert.Equal(t, files.TypeRegular, e.Type)
 		assert.Equal(t, relPath, e.RelatedPath)
 	}
 }
 
-func TestInitRDWriteTo(t *testing.T) {
+func TestArchiveWriteTo(t *testing.T) {
 	t.Run("unknown file type", func(t *testing.T) {
-		i := InitRD{}
+		i := Archive{}
 		_, err := i.fileTree.GetRoot().AddEntry("init", &files.Entry{
 			Type: files.Type(99),
 		})
@@ -95,7 +95,7 @@ func TestInitRDWriteTo(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Run("works", func(t *testing.T) {
-				i := InitRD{}
+				i := Archive{}
 				_, err := i.fileTree.GetRoot().AddEntry("init", &tt.entry)
 				require.NoError(t, err)
 				mock := archive.MockWriter{}
@@ -104,7 +104,7 @@ func TestInitRDWriteTo(t *testing.T) {
 				assert.Equal(t, tt.mock, mock)
 			})
 			t.Run("fails", func(t *testing.T) {
-				i := InitRD{}
+				i := Archive{}
 				_, err := i.fileTree.GetRoot().AddEntry("init", &tt.entry)
 				require.NoError(t, err)
 				mock := archive.MockWriter{Err: assert.AnError}

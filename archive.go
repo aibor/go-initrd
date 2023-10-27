@@ -1,4 +1,4 @@
-package initrd
+package initramfs
 
 import (
 	"fmt"
@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/aibor/go-initrd/internal/archive"
-	"github.com/aibor/go-initrd/internal/files"
+	"github.com/aibor/initramfs/internal/archive"
+	"github.com/aibor/initramfs/internal/files"
 )
 
 const (
@@ -20,28 +20,28 @@ const (
 	LibSearchPath = "/lib:/lib64:/usr/lib:/usr/lib64"
 )
 
-// InitRD represents a file tree that can be used as an initrd for the Linux
-// kernel.
+// Archive represents a file tree that can be used as an initramfs for the
+// Linux kernel.
 //
 // Create a new instance using [New]. Additional files can be added with
-// [InitRD.AddFiles]. Dynamically linked ELF libraries can be resolved and added
-// for all already added files by calling [InitRD.ResolveLinkedLibs]. Once
-// ready, write the [InitRD] with [InitRD.WriteCPIO].
-type InitRD struct {
+// [Archive.AddFiles]. Dynamically linked ELF libraries can be resolved and
+// added for all already added files by calling [Archive.ResolveLinkedLibs].
+// Once ready, write the [Archive] with [Archive.WriteCPIO].
+type Archive struct {
 	fileTree files.Tree
 }
 
-// New creates a new [InitRD] with the given file added as "/init".
-func New(initFile string) *InitRD {
-	i := InitRD{}
+// New creates a new [Archive] with the given file added as "/init".
+func New(initFile string) *Archive {
+	a := Archive{}
 	// THis can never fail on a new tree.
-	_, _ = i.fileTree.GetRoot().AddFile("init", initFile)
-	return &i
+	_, _ = a.fileTree.GetRoot().AddFile("init", initFile)
+	return &a
 }
 
 // AddFiles creates [FilesDir] and adds the given files to it.
-func (i *InitRD) AddFiles(files ...string) error {
-	dirEntry, err := i.fileTree.Mkdir(FilesDir)
+func (a *Archive) AddFiles(files ...string) error {
+	dirEntry, err := a.fileTree.Mkdir(FilesDir)
 	if err != nil {
 		return fmt.Errorf("add dir: %v", err)
 	}
@@ -56,12 +56,12 @@ func (i *InitRD) AddFiles(files ...string) error {
 }
 
 // ResolveLinkedLibs recursively resolves the dynamically linked libraries of
-// all regular files in the [InitRD].
+// all regular files in the [Archive].
 //
 // If the given searchPath string is empty the default [LibSearchPath] is used.
 // Resolved libraries are added to [LibsDir]. For each search path a symoblic
 // link is added pointiong to [LibsDir].
-func (i *InitRD) ResolveLinkedLibs(searchPath string) error {
+func (a *Archive) ResolveLinkedLibs(searchPath string) error {
 	if searchPath == "" {
 		searchPath = LibSearchPath
 	}
@@ -72,7 +72,7 @@ func (i *InitRD) ResolveLinkedLibs(searchPath string) error {
 		SearchPaths: searchPaths,
 	}
 
-	err := i.fileTree.Walk(func(path string, entry *files.Entry) error {
+	err := a.fileTree.Walk(func(path string, entry *files.Entry) error {
 		if entry.Type != files.TypeRegular {
 			return nil
 		}
@@ -82,7 +82,7 @@ func (i *InitRD) ResolveLinkedLibs(searchPath string) error {
 		return fmt.Errorf("resolve: %v", err)
 	}
 
-	dirEntry, err := i.fileTree.Mkdir(LibsDir)
+	dirEntry, err := a.fileTree.Mkdir(LibsDir)
 	if err != nil {
 		return fmt.Errorf("add libs dir: %v", err)
 	}
@@ -95,7 +95,7 @@ func (i *InitRD) ResolveLinkedLibs(searchPath string) error {
 
 	absLibDir := filepath.Join(string(filepath.Separator), LibsDir)
 	for _, searchPath := range searchPaths {
-		err := i.fileTree.Ln(absLibDir, searchPath)
+		err := a.fileTree.Ln(absLibDir, searchPath)
 		if err != nil && err != files.ErrEntryExists {
 			return fmt.Errorf("add link %s: %v", searchPath, err)
 		}
@@ -104,15 +104,15 @@ func (i *InitRD) ResolveLinkedLibs(searchPath string) error {
 	return nil
 }
 
-// WriteCPIO writes the [InitRD] as CPIO archive to the given writer.
-func (i *InitRD) WriteCPIO(writer io.Writer) error {
+// WriteCPIO writes the [Archive] as CPIO archive to the given writer.
+func (a *Archive) WriteCPIO(writer io.Writer) error {
 	w := archive.NewCPIOWriter(writer)
 	defer w.Close()
-	return i.writeTo(w)
+	return a.writeTo(w)
 }
 
-func (i *InitRD) writeTo(writer archive.Writer) error {
-	return i.fileTree.Walk(func(path string, entry *files.Entry) error {
+func (a *Archive) writeTo(writer archive.Writer) error {
+	return a.fileTree.Walk(func(path string, entry *files.Entry) error {
 		switch entry.Type {
 		case files.TypeRegular:
 			return writer.WriteRegular(path, entry.RelatedPath, 0755)

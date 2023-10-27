@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/aibor/go-initrd"
+	"github.com/aibor/initramfs"
 )
 
 func run(args []string) error {
@@ -16,14 +16,14 @@ func run(args []string) error {
 	additionalFiles := args[1:]
 	libSearchPath := os.Getenv("LD_LIBRARY_PATH")
 
-	initRD := initrd.New(initFile)
-	if err := initRD.AddFiles(additionalFiles...); err != nil {
+	initRamFS := initramfs.New(initFile)
+	if err := initRamFS.AddFiles(additionalFiles...); err != nil {
 		return fmt.Errorf("add files: %v", err)
 	}
-	if err := initRD.ResolveLinkedLibs(libSearchPath); err != nil {
+	if err := initRamFS.ResolveLinkedLibs(libSearchPath); err != nil {
 		return fmt.Errorf("add linked libs: %v", err)
 	}
-	if err := initRD.WriteCPIO(os.Stdout); err != nil {
+	if err := initRamFS.WriteCPIO(os.Stdout); err != nil {
 		return fmt.Errorf("write: %v", err)
 	}
 

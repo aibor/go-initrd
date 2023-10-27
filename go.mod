@@ -1,6 +1,6 @@
-module github.com/aibor/go-initrd
+module github.com/aibor/initramfs
 
-go 1.21.3
+go 1.21
 
 require (
 	github.com/cavaliergopher/cpio v1.0.1

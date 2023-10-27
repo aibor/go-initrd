@@ -1,8 +1,8 @@
-# go-initrd
+# initramfs
 
-[![PkgGoDev](https://pkg.go.dev/badge/github.com/aibor/go-initrd)](https://pkg.go.dev/github.com/aibor/go-initrd)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/aibor/initramfs)](https://pkg.go.dev/github.com/aibor/initramfs)
 
-go-initrd is a library for creating simple initrd CPIO archives.
+initramfs is a library for creating simple initramfs CPIO archives.
 
-See [Go package reference](https://pkg.go.dev/github.com/aibor/go-initrd) 
+See [Go package reference](https://pkg.go.dev/github.com/aibor/initramfs) 
 for full package documentation. 
