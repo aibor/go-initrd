@@ -22,7 +22,7 @@ jobs:
           version: latest
 
       - name: Run go test
-        run: go test -v -cover -coverprofile cover.out ./...
+        run: go test -v -race -cover -covermode atomic -coverprofile cover.out ./...
 
       - name: Run go tool cover
         run: go tool cover -func=cover.out
