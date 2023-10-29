@@ -20,7 +20,7 @@ const (
 	// beside the init file.
 	FilesDir = "files"
 	// LibSearchPath defines the directories to lookup linked libraries.
-	LibSearchPath = "/lib:/lib64:/usr/lib:/usr/lib64"
+	LibSearchPath = "/lib:/lib64:/usr/lib:/usr/lib64:/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu"
 )
 
 // Archive represents a file tree that can be used as an initramfs for the
