@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/aibor/initramfs/internal/archive"
 	"github.com/aibor/initramfs/internal/files"
@@ -37,7 +38,7 @@ type Archive struct {
 // New creates a new [Archive] with the given file added as "/init".
 func New(initFile string) *Archive {
 	a := Archive{sourceFS: os.DirFS("/")}
-	// THis can never fail on a new tree.
+	// This can never fail on a new tree.
 	_, _ = a.fileTree.GetRoot().AddFile("init", initFile)
 	return &a
 }
@@ -136,7 +137,9 @@ func (a *Archive) writeTo(writer archive.Writer) error {
 	return a.fileTree.Walk(func(path string, entry *files.Entry) error {
 		switch entry.Type {
 		case files.TypeRegular:
-			source, err := a.sourceFS.Open(entry.RelatedPath)
+			// Cut leading / since fs.FS considers it invalid.
+			relPath := strings.TrimPrefix(entry.RelatedPath, "/")
+			source, err := a.sourceFS.Open(relPath)
 			if err != nil {
 				return err
 			}

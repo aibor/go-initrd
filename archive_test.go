@@ -102,7 +102,7 @@ func TestArchiveWriteTo(t *testing.T) {
 				name: "regular",
 				entry: files.Entry{
 					Type:        files.TypeRegular,
-					RelatedPath: "input",
+					RelatedPath: "/input",
 				},
 				mock: archive.MockWriter{
 					Path:   "/init",
@@ -141,7 +141,7 @@ func TestArchiveWriteTo(t *testing.T) {
 					require.NoError(t, err)
 					mock := archive.MockWriter{}
 					err = i.writeTo(&mock)
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, tt.mock, mock)
 				})
 				t.Run("fails", func(t *testing.T) {
