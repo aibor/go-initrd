@@ -3,6 +3,8 @@ package initramfs
 import (
 	"fmt"
 	"io"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"slices"
 
@@ -29,11 +31,12 @@ const (
 // Once ready, write the [Archive] with [Archive.WriteCPIO].
 type Archive struct {
 	fileTree files.Tree
+	sourceFS fs.FS
 }
 
 // New creates a new [Archive] with the given file added as "/init".
 func New(initFile string) *Archive {
-	a := Archive{}
+	a := Archive{sourceFS: os.DirFS("/")}
 	// THis can never fail on a new tree.
 	_, _ = a.fileTree.GetRoot().AddFile("init", initFile)
 	return &a
@@ -115,7 +118,12 @@ func (a *Archive) writeTo(writer archive.Writer) error {
 	return a.fileTree.Walk(func(path string, entry *files.Entry) error {
 		switch entry.Type {
 		case files.TypeRegular:
-			return writer.WriteRegular(path, entry.RelatedPath, 0755)
+			source, err := a.sourceFS.Open(entry.RelatedPath)
+			if err != nil {
+				return err
+			}
+			defer source.Close()
+			return writer.WriteRegular(path, source, 0755)
 		case files.TypeDirectory:
 			return writer.WriteDirectory(path)
 		case files.TypeLink:

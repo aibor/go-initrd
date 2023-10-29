@@ -5,13 +5,14 @@ import "io/fs"
 type MockWriter struct {
 	Path        string
 	RelatedPath string
+	Source      fs.File
 	Mode        fs.FileMode
 	Err         error
 }
 
-func (m *MockWriter) WriteRegular(path, source string, mode fs.FileMode) error {
+func (m *MockWriter) WriteRegular(path string, source fs.File, mode fs.FileMode) error {
 	m.Path = path
-	m.RelatedPath = source
+	m.Source = source
 	m.Mode = mode
 	return m.Err
 }

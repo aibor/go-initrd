@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"os"
 
 	"github.com/cavaliergopher/cpio"
 )
@@ -68,14 +67,8 @@ func (w *CPIOWriter) WriteLink(path, target string) error {
 }
 
 // WriteRegular copies the exisiting file from source into the archive.
-func (w *CPIOWriter) WriteRegular(path, source string, mode fs.FileMode) error {
-	file, err := os.Open(source)
-	if err != nil {
-		return fmt.Errorf("open file %s: %v", source, err)
-	}
-	defer file.Close()
-
-	info, err := file.Stat()
+func (w *CPIOWriter) WriteRegular(path string, source fs.File, mode fs.FileMode) error {
+	info, err := source.Stat()
 	if err != nil {
 		return fmt.Errorf("read info: %v", err)
 	}
@@ -97,7 +90,7 @@ func (w *CPIOWriter) WriteRegular(path, source string, mode fs.FileMode) error {
 		return err
 	}
 
-	if _, err := io.Copy(w.cpioWriter, file); err != nil {
+	if _, err := io.Copy(w.cpioWriter, source); err != nil {
 		return fmt.Errorf("write body for %s: %v", path, err)
 	}
 

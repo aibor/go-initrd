@@ -1,8 +1,10 @@
 package initramfs
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
+	"testing/fstest"
 
 	"github.com/aibor/initramfs/internal/archive"
 	"github.com/aibor/initramfs/internal/files"
@@ -12,6 +14,7 @@ import (
 
 func TestArchiveNew(t *testing.T) {
 	archive := New("first")
+	assert.Equal(t, os.DirFS("/"), archive.sourceFS)
 	entry, err := archive.fileTree.GetEntry("/init")
 	require.NoError(t, err)
 	assert.Equal(t, "first", entry.RelatedPath)
@@ -42,75 +45,94 @@ func TestArchiveAddFile(t *testing.T) {
 }
 
 func TestArchiveWriteTo(t *testing.T) {
-	t.Run("unknown file type", func(t *testing.T) {
-		i := Archive{}
-		_, err := i.fileTree.GetRoot().AddEntry("init", &files.Entry{
-			Type: files.Type(99),
-		})
+	testFS := fstest.MapFS{
+		"input": &fstest.MapFile{},
+	}
+	testFile, err := testFS.Open("input")
+	require.NoError(t, err)
+
+	test := func(entry *files.Entry, w *archive.MockWriter) error {
+		i := Archive{sourceFS: testFS}
+		_, err := i.fileTree.GetRoot().AddEntry("init", entry)
 		require.NoError(t, err)
-		err = i.writeTo(&archive.MockWriter{})
+		return i.writeTo(w)
+	}
+
+	t.Run("unknown file type", func(t *testing.T) {
+		err := test(&files.Entry{Type: files.Type(99)}, &archive.MockWriter{})
 		assert.ErrorContains(t, err, "unknown file type 99")
 	})
 
-	tests := []struct {
-		name  string
-		entry files.Entry
-		mock  archive.MockWriter
-	}{
-		{
-			name: "regular",
-			entry: files.Entry{
-				Type:        files.TypeRegular,
-				RelatedPath: "input",
-			},
-			mock: archive.MockWriter{
-				Path:        "/init",
-				RelatedPath: "input",
-				Mode:        0755,
-			},
-		},
-		{
-			name: "directory",
-			entry: files.Entry{
-				Type: files.TypeDirectory,
-			},
-			mock: archive.MockWriter{
-				Path: "/init",
-			},
-		},
-		{
-			name: "link",
-			entry: files.Entry{
-				Type:        files.TypeLink,
-				RelatedPath: "/lib",
-			},
-			mock: archive.MockWriter{
-				Path:        "/init",
-				RelatedPath: "/lib",
-			},
-		},
-	}
+	t.Run("nonexisting source", func(t *testing.T) {
+		entry := &files.Entry{
+			Type:        files.TypeRegular,
+			RelatedPath: "nonexisting",
+		}
+		err := test(entry, &archive.MockWriter{})
+		assert.ErrorContains(t, err, "open nonexisting: file does not exist")
+	})
 
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Run("works", func(t *testing.T) {
-				i := Archive{}
-				_, err := i.fileTree.GetRoot().AddEntry("init", &tt.entry)
-				require.NoError(t, err)
-				mock := archive.MockWriter{}
-				err = i.writeTo(&mock)
-				assert.NoError(t, err)
-				assert.Equal(t, tt.mock, mock)
+	t.Run("existing files", func(t *testing.T) {
+		tests := []struct {
+			name  string
+			entry files.Entry
+			mock  archive.MockWriter
+		}{
+			{
+				name: "regular",
+				entry: files.Entry{
+					Type:        files.TypeRegular,
+					RelatedPath: "input",
+				},
+				mock: archive.MockWriter{
+					Path:   "/init",
+					Source: testFile,
+					Mode:   0755,
+				},
+			},
+			{
+				name: "directory",
+				entry: files.Entry{
+					Type: files.TypeDirectory,
+				},
+				mock: archive.MockWriter{
+					Path: "/init",
+				},
+			},
+			{
+				name: "link",
+				entry: files.Entry{
+					Type:        files.TypeLink,
+					RelatedPath: "/lib",
+				},
+				mock: archive.MockWriter{
+					Path:        "/init",
+					RelatedPath: "/lib",
+				},
+			},
+		}
+
+		for _, tt := range tests {
+			tt := tt
+			t.Run(tt.name, func(t *testing.T) {
+				t.Run("works", func(t *testing.T) {
+					i := Archive{sourceFS: testFS}
+					_, err := i.fileTree.GetRoot().AddEntry("init", &tt.entry)
+					require.NoError(t, err)
+					mock := archive.MockWriter{}
+					err = i.writeTo(&mock)
+					assert.NoError(t, err)
+					assert.Equal(t, tt.mock, mock)
+				})
+				t.Run("fails", func(t *testing.T) {
+					i := Archive{sourceFS: testFS}
+					_, err := i.fileTree.GetRoot().AddEntry("init", &tt.entry)
+					require.NoError(t, err)
+					mock := archive.MockWriter{Err: assert.AnError}
+					err = i.writeTo(&mock)
+					assert.Error(t, err, assert.AnError)
+				})
 			})
-			t.Run("fails", func(t *testing.T) {
-				i := Archive{}
-				_, err := i.fileTree.GetRoot().AddEntry("init", &tt.entry)
-				require.NoError(t, err)
-				mock := archive.MockWriter{Err: assert.AnError}
-				err = i.writeTo(&mock)
-				assert.Error(t, err, assert.AnError)
-			})
-		})
-	}
+		}
+	})
 }
