@@ -42,6 +42,24 @@ func New(initFile string) *Archive {
 	return &a
 }
 
+// AddFile creates [FilesDir] and adds the given file to it. If name is empty
+// the base name of the file is used.
+func (a *Archive) AddFile(name, file string) error {
+	dirEntry, err := a.fileTree.Mkdir(FilesDir)
+	if err != nil {
+		return fmt.Errorf("add dir: %v", err)
+	}
+
+	if name == "" {
+		name = filepath.Base(file)
+	}
+	if _, err := dirEntry.AddFile(name, file); err != nil {
+		return fmt.Errorf("add file %s: %v", file, err)
+	}
+
+	return nil
+}
+
 // AddFiles creates [FilesDir] and adds the given files to it.
 func (a *Archive) AddFiles(files ...string) error {
 	dirEntry, err := a.fileTree.Mkdir(FilesDir)

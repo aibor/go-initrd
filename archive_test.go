@@ -24,6 +24,26 @@ func TestArchiveNew(t *testing.T) {
 func TestArchiveAddFile(t *testing.T) {
 	archive := New("first")
 
+	require.NoError(t, archive.AddFile("second", "rel/third"))
+	require.NoError(t, archive.AddFile("", "/abs/fourth"))
+
+	expected := map[string]string{
+		"second": "rel/third",
+		"fourth": "/abs/fourth",
+	}
+
+	for file, relPath := range expected {
+		path := filepath.Join("files", file)
+		e, err := archive.fileTree.GetEntry(path)
+		require.NoError(t, err, path)
+		assert.Equal(t, files.TypeRegular, e.Type)
+		assert.Equal(t, relPath, e.RelatedPath)
+	}
+}
+
+func TestArchiveAddFiles(t *testing.T) {
+	archive := New("first")
+
 	require.NoError(t, archive.AddFiles("second", "rel/third", "/abs/fourth"))
 	require.NoError(t, archive.AddFiles("fifth"))
 	require.NoError(t, archive.AddFiles())
