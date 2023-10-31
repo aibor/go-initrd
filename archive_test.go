@@ -156,3 +156,47 @@ func TestArchiveWriteTo(t *testing.T) {
 		}
 	})
 }
+
+func TestArchiveResolveLinkedLibs(t *testing.T) {
+	archive := New("internal/files/testdata/bin/main")
+	err := archive.ResolveLinkedLibs("internal/files/testdata/lib")
+	require.NoError(t, err)
+
+	expectedFiles := map[string]files.Entry{
+		"/lib": {
+			Type: files.TypeDirectory,
+		},
+		"/lib/libfunc2.so": {
+			Type:        files.TypeRegular,
+			RelatedPath: "internal/files/testdata/lib/libfunc2.so",
+		},
+		"/lib/libfunc3.so": {
+			Type:        files.TypeRegular,
+			RelatedPath: "internal/files/testdata/lib/libfunc3.so",
+		},
+		"/lib/libfunc1.so": {
+			Type:        files.TypeRegular,
+			RelatedPath: "internal/files/testdata/lib/libfunc1.so",
+		},
+		"/internal": {
+			Type: files.TypeDirectory,
+		},
+		"/internal/files": {
+			Type: files.TypeDirectory,
+		},
+		"/internal/files/testdata": {
+			Type: files.TypeDirectory,
+		},
+		"/internal/files/testdata/lib": {
+			Type:        files.TypeLink,
+			RelatedPath: "/lib",
+		},
+	}
+
+	for f, e := range expectedFiles {
+		entry, err := archive.fileTree.GetEntry(f)
+		require.NoError(t, err)
+		assert.Equal(t, e.Type, entry.Type)
+		assert.Equal(t, e.RelatedPath, entry.RelatedPath)
+	}
+}

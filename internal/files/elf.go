@@ -22,7 +22,7 @@ type ELFLibResolver struct {
 // are added with their absolute path to [ELFLibResolver]'s list of libs. Call
 // [ELFLibResolver.Libs] once all files are resolved.
 func (r *ELFLibResolver) Resolve(elfFile string) error {
-	libs, err := linkedLibs(elfFile)
+	libs, err := LinkedLibs(elfFile)
 	if err != nil {
 		return fmt.Errorf("get linked libs: %v", err)
 	}
@@ -55,9 +55,9 @@ func (r *ELFLibResolver) Resolve(elfFile string) error {
 	return nil
 }
 
-// linkedLibs fetches the list of dynamically linked libraries from the ELF
+// LinkedLibs fetches the list of dynamically linked libraries from the ELF
 // file.
-func linkedLibs(elfFilePath string) ([]string, error) {
+func LinkedLibs(elfFilePath string) ([]string, error) {
 	elfFile, err := elf.Open(elfFilePath)
 	if err != nil {
 		return nil, err
