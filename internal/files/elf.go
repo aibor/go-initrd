@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
+
+	"golang.org/x/exp/slices"
 )
 
 // ELFLibResolver resolves dynamically linked libraries of ELF file. It collects

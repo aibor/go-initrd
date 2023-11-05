@@ -1,10 +1,11 @@
 module github.com/aibor/initramfs
 
-go 1.21
+go 1.18
 
 require (
 	github.com/cavaliergopher/cpio v1.0.1
 	github.com/stretchr/testify v1.8.4
+	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 )
 
 require (

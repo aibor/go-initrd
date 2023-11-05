@@ -6,8 +6,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/aibor/initramfs/internal/archive"
 	"github.com/aibor/initramfs/internal/files"
