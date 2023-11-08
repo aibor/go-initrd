@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/aibor/initramfs"
 )
@@ -12,8 +13,20 @@ func run(args []string) error {
 		return fmt.Errorf("no init file given")
 	}
 
-	initFile := args[0]
-	additionalFiles := args[1:]
+	initFile, err := absPath(args[0])
+	if err != nil {
+		return err
+	}
+
+	additionalFiles := make([]string, 0)
+	for _, file := range args[1:] {
+		path, err := absPath(file)
+		if err != nil {
+			return err
+		}
+		additionalFiles = append(additionalFiles, path)
+	}
+
 	libSearchPath := os.Getenv("LD_LIBRARY_PATH")
 
 	initRamFS := initramfs.New(initFile)
@@ -28,6 +41,14 @@ func run(args []string) error {
 	}
 
 	return nil
+}
+
+func absPath(file string) (string, error) {
+	path, err := filepath.Abs(file)
+	if err != nil {
+		return "", fmt.Errorf("lookup absolute path for %s: %v", file, err)
+	}
+	return path, nil
 }
 
 func main() {

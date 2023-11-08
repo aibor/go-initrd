@@ -37,45 +37,37 @@ type Archive struct {
 }
 
 // New creates a new [Archive] with the given file added as "/init".
-func New(initFile string) *Archive {
+// The file path must be absolute or relative to "/".
+func New(initFilePath string) *Archive {
 	a := Archive{sourceFS: os.DirFS("/")}
 	// This can never fail on a new tree.
-	_, _ = a.fileTree.GetRoot().AddFile("init", initFile)
+	_, _ = a.fileTree.GetRoot().AddFile("init", initFilePath)
 	return &a
 }
 
 // AddFile creates [FilesDir] and adds the given file to it. If name is empty
 // the base name of the file is used.
-func (a *Archive) AddFile(name, file string) error {
-	dirEntry, err := a.fileTree.Mkdir(FilesDir)
-	if err != nil {
-		return fmt.Errorf("add dir: %v", err)
-	}
-
+// The file path must be absolute or relative to "/".
+func (a *Archive) AddFile(name, path string) error {
 	if name == "" {
-		name = filepath.Base(file)
+		name = filepath.Base(path)
 	}
-	if _, err := dirEntry.AddFile(name, file); err != nil {
-		return fmt.Errorf("add file %s: %v", file, err)
-	}
-
-	return nil
+	return a.withDirEntry(FilesDir, func(dirEntry *files.Entry) error {
+		return addFile(dirEntry, name, path)
+	})
 }
 
 // AddFiles creates [FilesDir] and adds the given files to it.
-func (a *Archive) AddFiles(files ...string) error {
-	dirEntry, err := a.fileTree.Mkdir(FilesDir)
-	if err != nil {
-		return fmt.Errorf("add dir: %v", err)
-	}
-
-	for _, file := range files {
-		if _, err := dirEntry.AddFile(filepath.Base(file), file); err != nil {
-			return fmt.Errorf("add file %s: %v", file, err)
+// The file paths must be absolute or relative to "/".
+func (a *Archive) AddFiles(paths ...string) error {
+	return a.withDirEntry(FilesDir, func(dirEntry *files.Entry) error {
+		for _, file := range paths {
+			if err := addFile(dirEntry, filepath.Base(file), file); err != nil {
+				return err
+			}
 		}
-	}
-
-	return nil
+		return nil
+	})
 }
 
 // ResolveLinkedLibs recursively resolves the dynamically linked libraries of
@@ -105,15 +97,16 @@ func (a *Archive) ResolveLinkedLibs(searchPath string) error {
 		return fmt.Errorf("resolve: %v", err)
 	}
 
-	dirEntry, err := a.fileTree.Mkdir(LibsDir)
-	if err != nil {
-		return fmt.Errorf("add libs dir: %v", err)
-	}
-	for _, lib := range resolver.Libs {
-		name := filepath.Base(lib)
-		if _, err := dirEntry.AddFile(name, lib); err != nil {
-			return fmt.Errorf("add lib %s: %v", name, err)
+	if err := a.withDirEntry(LibsDir, func(dirEntry *files.Entry) error {
+		for _, lib := range resolver.Libs {
+			name := filepath.Base(lib)
+			if _, err := dirEntry.AddFile(name, lib); err != nil {
+				return fmt.Errorf("add lib %s: %v", name, err)
+			}
 		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	absLibDir := filepath.Join(string(filepath.Separator), LibsDir)
@@ -154,4 +147,19 @@ func (a *Archive) writeTo(writer archive.Writer) error {
 			return fmt.Errorf("unknown file type %d", entry.Type)
 		}
 	})
+}
+
+func (a *Archive) withDirEntry(dir string, fn func(*files.Entry) error) error {
+	dirEntry, err := a.fileTree.Mkdir(dir)
+	if err != nil {
+		return fmt.Errorf("add dir %s: %v", dir, err)
+	}
+	return fn(dirEntry)
+}
+
+func addFile(dirEntry *files.Entry, name, path string) error {
+	if _, err := dirEntry.AddFile(name, path); err != nil {
+		return fmt.Errorf("add file %s: %v", path, err)
+	}
+	return nil
 }
